@@ -20,11 +20,15 @@ jobs:
         eval "$(/opt/homebrew/bin/brew shellenv)"
     
     - name: Install XcodeGen
-      run: brew install xcodegen
-    
-    - name: Set up Xcode
       run: |
-        sudo xcode-select -switch /Applications/Xcode_15.4.app
+        brew install xcodegen
+    
+    - name: Select Xcode
+      run: |
+        # List all available Xcode versions
+        ls /Applications/
+        # Select the latest stable Xcode
+        sudo xcode-select -switch /Applications/Xcode_16.2.app || sudo xcode-select -switch /Applications/Xcode_16.1.app || sudo xcode-select -switch /Applications/Xcode_15.4.app || sudo xcode-select -switch /Applications/Xcode.app
         xcodebuild -version
     
     - name: Extract ZIP
