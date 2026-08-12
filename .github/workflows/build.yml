@@ -1,0 +1,73 @@
+name: Build iOS App (Unsigned)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Install Homebrew
+      run: |
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zshrc
+        eval "$(/opt/homebrew/bin/brew shellenv)"
+    
+    - name: Install XcodeGen
+      run: brew install xcodegen
+    
+    - name: Set up Xcode
+      run: |
+        sudo xcode-select -switch /Applications/Xcode_15.4.app
+        xcodebuild -version
+    
+    - name: Extract ZIP
+      run: |
+        unzip CubeRunLevelUp.zip -d CubeRunLevelUp
+        ls -la CubeRunLevelUp/
+    
+    - name: Generate Xcode Project
+      run: |
+        cd CubeRunLevelUp
+        xcodegen generate
+    
+    - name: Build .app (Unsigned)
+      run: |
+        cd CubeRunLevelUp
+        xcodebuild -project CubeRunLevelUp.xcodeproj \
+          -scheme CubeRunLevelUp \
+          -destination 'generic/platform=iOS' \
+          -derivedDataPath build \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          build
+    
+    - name: Create Payload Folder
+      run: |
+        cd CubeRunLevelUp
+        mkdir -p Payload
+        cp -R build/Build/Products/Debug-iphoneos/CubeRunLevelUp.app Payload/
+    
+    - name: Zip to IPA
+      run: |
+        cd CubeRunLevelUp
+        zip -r CubeRunLevelUp.ipa Payload/
+    
+    - name: Upload IPA (Unsigned)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CubeRunLevelUp.ipa
+        path: CubeRunLevelUp/CubeRunLevelUp.ipa
+    
+    - name: Upload .app (for debugging)
+      uses: actions/upload-artifact@v4
+      with:
+        name: CubeRunLevelUp.app
+        path: CubeRunLevelUp/build/Build/Products/Debug-iphoneos/CubeRunLevelUp.app
