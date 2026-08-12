@@ -20,30 +20,46 @@ jobs:
         eval "$(/opt/homebrew/bin/brew shellenv)"
     
     - name: Install XcodeGen
-      run: |
-        brew install xcodegen
+      run: brew install xcodegen
     
     - name: Select Xcode
       run: |
-        # List all available Xcode versions
-        ls /Applications/
-        # Select the latest stable Xcode
-        sudo xcode-select -switch /Applications/Xcode_16.2.app || sudo xcode-select -switch /Applications/Xcode_16.1.app || sudo xcode-select -switch /Applications/Xcode_15.4.app || sudo xcode-select -switch /Applications/Xcode.app
+        sudo xcode-select --reset
         xcodebuild -version
     
     - name: Extract ZIP
       run: |
         unzip CubeRunLevelUp.zip -d CubeRunLevelUp
         ls -la CubeRunLevelUp/
+        # Check if project.yml is inside the extracted folder
+        find CubeRunLevelUp -name "project.yml" -type f
+    
+    - name: Move project.yml to Root (if needed)
+      run: |
+        # If project.yml is inside the CubeRunLevelUp folder, move it to the root
+        if [ -f "CubeRunLevelUp/project.yml" ]; then
+          echo "Moving project.yml to root..."
+          cp CubeRunLevelUp/project.yml .
+        elif [ -f "CubeRunLevelUp/CubeRunLevelUp/project.yml" ]; then
+          echo "Moving nested project.yml to root..."
+          cp CubeRunLevelUp/CubeRunLevelUp/project.yml .
+        elif [ -f "project.yml" ]; then
+          echo "project.yml already at root!"
+        else
+          echo "ERROR: project.yml not found anywhere!"
+          find . -name "project.yml" -type f
+          exit 1
+        fi
+        ls -la project.yml
     
     - name: Generate Xcode Project
       run: |
-        cd CubeRunLevelUp
+        # Run xcodegen at the root where project.yml is located
         xcodegen generate
     
     - name: Build .app (Unsigned)
       run: |
-        cd CubeRunLevelUp
+        # Build from the generated .xcodeproj
         xcodebuild -project CubeRunLevelUp.xcodeproj \
           -scheme CubeRunLevelUp \
           -destination 'generic/platform=iOS' \
@@ -53,25 +69,27 @@ jobs:
           CODE_SIGNING_ALLOWED=NO \
           build
     
-    - name: Create Payload Folder
+    - name: Find .app and Create Payload
       run: |
-        cd CubeRunLevelUp
+        # Find the .app file
+        APP_PATH=$(find . -name "*.app" -type d | head -n 1)
+        echo "Found .app at: $APP_PATH"
+        
         mkdir -p Payload
-        cp -R build/Build/Products/Debug-iphoneos/CubeRunLevelUp.app Payload/
+        cp -R "$APP_PATH" Payload/
     
     - name: Zip to IPA
       run: |
-        cd CubeRunLevelUp
         zip -r CubeRunLevelUp.ipa Payload/
     
     - name: Upload IPA (Unsigned)
       uses: actions/upload-artifact@v4
       with:
         name: CubeRunLevelUp.ipa
-        path: CubeRunLevelUp/CubeRunLevelUp.ipa
+        path: CubeRunLevelUp.ipa
     
     - name: Upload .app (for debugging)
       uses: actions/upload-artifact@v4
       with:
         name: CubeRunLevelUp.app
-        path: CubeRunLevelUp/build/Build/Products/Debug-iphoneos/CubeRunLevelUp.app
+        path: Payload/CubeRunLevelUp.app
